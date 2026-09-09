@@ -82,6 +82,7 @@ def generate_configfile(output, force):
             distribution: normal
             parameters:
               median_length: 1000
+              sigma: 100
               min_length: 100
               max_length: 10000
             copy_number:
@@ -89,7 +90,39 @@ def generate_configfile(output, force):
               max: 5
               weights: [0.5, 0.3, 0.15, 0.05]
 
+          INV:
+            count: 50
+            distribution: pareto
+            parameters:
+              median_length: 1000
+              min_length: 100
+              max_length: 10000
+
+          TRA_COPY:
+            count: 25
+            distribution: normal
+            reverse_ratio: 0.2
+            parameters:
+              median_length: 1000
+              min_length: 100
+              max_length: 10000
+              sigma: 100
+
+          TRA_CUT:
+            count: 25
+            distribution: normal
+            reverse_ratio: 0.2
+            parameters:
+              median_length: 1000
+              min_length: 100
+              max_length: 10000
+              sigma: 100
+
           SNP:
+            count: 100
+            tstv_ratio: 2.0
+
+          MNP:
             count: 100
             tstv_ratio: 2.0
         """
