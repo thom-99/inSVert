@@ -158,6 +158,37 @@ variants:
     assert all(record.pos + len(record.ref) - 1 <= len(ref_seq) for record in records)
 
 
+def test_polymorphism_count_is_not_lost_across_contigs(tmp_path):
+    fasta_path = tmp_path / "ref.fa"
+    fasta_path.write_text(
+        "".join(f">chr{index}\n{'A' * 100}\n" for index in range(3))
+    )
+    pysam.faidx(str(fasta_path))
+
+    config_file = tmp_path / "config.yaml"
+    config_file.write_text("""
+genome:
+  ploidy: 1
+  heterozygosity: 0.0
+variants:
+  SNP:
+    count: 2
+    tstv_ratio: 2.0
+  MNP:
+    count: 2
+    tstv_ratio: 2.0
+""")
+
+    vcf_path = tmp_path / "out.vcf"
+    simulate.run(str(config_file), str(fasta_path), str(vcf_path), seed=123)
+
+    with pysam.VariantFile(str(vcf_path)) as vcf_reader:
+        records = list(vcf_reader)
+
+    assert sum(record.info.get('VT') == 'SNP' for record in records) == 2
+    assert sum(record.info.get('VT') == 'MNP' for record in records) == 2
+
+
 def test_insert_applies_mnp_without_length_change(tmp_path):
     fasta_path = tmp_path / "ref.fa"
     fasta_path.write_text(">chr1\nAACCGGTT\n")

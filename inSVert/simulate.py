@@ -264,65 +264,60 @@ def run(config_path, fasta_path, output_file, seed=None, excluded_bed=None, non_
 
             polymorphism_count = 0  # combined count used in the final log message
             total_skipped = 0       # candidates not placed after all retry attempts
-            genome_length = sum(lengths) # used to compute the ratio of polymorphisms
 
             for variant_type in polymorphism_types:
                 count = fakedict[variant_type]['count']
-                ratio = count / genome_length
                 tstv_ratio = fakedict[variant_type].get('tstv_ratio', 2.0)
 
-                for chrom, chrom_length in zip(chroms, lengths):
+                for _ in range(count):
+                    placed = False
+                    for _ in range(3):
 
-                    # defining the number of records per chrom
-                    n_variants_chrom = int(chrom_length * ratio)
-                    if n_variants_chrom == 0:
-                        continue
+                        # SNPs always replace one base.
+                        # MNP lengths are sampled from the internal weighted distribution in utils_sim.
+                        allele_length = 1 if variant_type == 'SNP' else utils_sim.pick_mnp_length()
 
-                    for _ in range(n_variants_chrom):
-                        placed = False
-                        for _ in range(3):
-
-                            # SNPs always replace one base. 
-                            # MNP lengths are sampled from the internal weighted distribution in utils_sim.
-                            allele_length = 1 if variant_type == 'SNP' else utils_sim.pick_mnp_length()
-
-                            pos = utils_sim.select_pos(chrom_length - allele_length + 1)
-                            end = pos + allele_length
-
-                            # 0-based half-open [x,y) BED coordinates - computed to check overlaps with bed files
-                            bed_start = pos - 1
-                            bed_end = bed_start + allele_length
-
-                            gt = utils_sim.generate_genotype(ploidy, heterozygosity)
-
-                            if (utils_sim.overlaps(chrom, pos, end, gt, sv_positions) or
-                                utils_sim.overlaps_excluded_region(chrom, bed_start, bed_end, excluded_regions)):
-                                continue
-
-                            ref_seq = utils_sim.fetch_ref_span(chrom, pos, end - 1, ref_fasta)
-                            if variant_type == 'SNP':
-                                alt_seq = utils_sim.pick_snp_alt(ref_seq, tstv_ratio)
-                            else:
-                                alt_seq = utils_sim.pick_mnp_alt(ref_seq, tstv_ratio)
-                            if alt_seq is None:
-                                # Non-ACGT reference sequence cannot be mutated with the Ts/Tv model; try a different location.
-                                continue
-
-                            placed = True
-                            break
-
-                        if not placed:
-                            total_skipped += 1
+                        chrom, chrom_length = utils_sim.select_chr(chroms, lengths)
+                        if chrom_length < allele_length:
                             continue
 
-                        polymorphism_count += 1
+                        pos = utils_sim.select_pos(chrom_length - allele_length + 1)
+                        end = pos + allele_length
 
-                        # write the SNP/MNP 
-                        polymorphism_id = f'inSVert.{variant_type}.{polymorphism_count}'
-                        polymorphism = VariantObjects.Polymorphism(chrom, pos, polymorphism_id, gt, ref_seq, alt_seq)
+                        # 0-based half-open [x,y) BED coordinates - computed to check overlaps with bed files
+                        bed_start = pos - 1
+                        bed_end = bed_start + allele_length
 
-                        utils_sim.track_sv(sv_positions, chrom, pos, end, gt)
-                        vcf.write(polymorphism.format() + '\n')
+                        gt = utils_sim.generate_genotype(ploidy, heterozygosity)
+
+                        if (utils_sim.overlaps(chrom, pos, end, gt, sv_positions) or
+                            utils_sim.overlaps_excluded_region(chrom, bed_start, bed_end, excluded_regions)):
+                            continue
+
+                        ref_seq = utils_sim.fetch_ref_span(chrom, pos, end - 1, ref_fasta)
+                        if variant_type == 'SNP':
+                            alt_seq = utils_sim.pick_snp_alt(ref_seq, tstv_ratio)
+                        else:
+                            alt_seq = utils_sim.pick_mnp_alt(ref_seq, tstv_ratio)
+                        if alt_seq is None:
+                            # Non-ACGT reference sequence cannot be mutated with the Ts/Tv model; try a different location.
+                            continue
+
+                        placed = True
+                        break
+
+                    if not placed:
+                        total_skipped += 1
+                        continue
+
+                    polymorphism_count += 1
+
+                    # write the SNP/MNP
+                    polymorphism_id = f'inSVert.{variant_type}.{polymorphism_count}'
+                    polymorphism = VariantObjects.Polymorphism(chrom, pos, polymorphism_id, gt, ref_seq, alt_seq)
+
+                    utils_sim.track_sv(sv_positions, chrom, pos, end, gt)
+                    vcf.write(polymorphism.format() + '\n')
 
             print(f"Placed {polymorphism_count} DNA polymorphisms across {len(chroms)} contig(s) ({total_skipped} skipped)")
 
