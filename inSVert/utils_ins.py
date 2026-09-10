@@ -37,7 +37,7 @@ def generate_seq(length:int, gc_content:float) -> str:
 
 def reverse_complement(sequence: str) -> str:
     """Returns reverse complement string."""
-    complement = str.maketrans("ATGCNatgcn", "TACGNtacgn")
+    complement = str.maketrans("ACGTRYSWKMBDHVNacgtryswkmbdhvn", "TGCAYRSWMKVHDBNtgcayrswmkvhdbn")
     return sequence.translate(complement)[::-1]
 
 def extract_explicit_ins_sequence(var):
